@@ -189,9 +189,14 @@ void mov (uint32_t pos, char axis, char dir)//,no probada
 	}
 	for (uint32_t i = 0; i < pos; i++)
 	{
-		//CÓDIGO CORRESPONIDENTE AL MOVIMIENTO CON ACCELERACIÓN //*****(EN DESICIÓN EL USO DE LUT O CÁLCULO EN TIEMPO REAL)******
+		// CÓDIGO CORRESPONIDENTE AL MOVIMIENTO CON ACCELERACIÓN //*****(EN DESICIÓN EL USO DE LUT O CÁLCULO EN TIEMPO REAL)******
+		
+		
 		step(axis, dly);
 		
+		
+		// PASAR POR REFERENCIA EL MOTOR A PASOS A MOVER, PARA PODER ACTUALIZAR EL VALOR DE POSICION ACTUAL Y AHI MISMO CARGAR EL VALOR DE POSICION FINAL PARA 
+		//ELIMINAR uint32_t pos, PUES EL MISMO TRABAJO SE REALIZA EN LA ESTRUCTURA DEL STEPPER CON EL ATRIBUTO f_pos
 	}
 }
 
@@ -227,7 +232,7 @@ void init_gripper (uint8_t servo1, uint8_t servo2) //Función terminada, no proba
 	OCR1B = servo2;
 }
 
-void gripper (uint8_t gripper1_pos, uint8_t gripper2_pos)//, no probada
+void gripper (uint8_t gripper1_pos, uint8_t gripper2_pos)//Función terminada, no probada
 {
 	//++++++++++++++++++++++++++++++++ GENERAR CONVERSIONES DE GRADOS A VALOR CONTADOR ++++++++++++++++++++++++++++++++++++++++
 	OCR1A = gripper1_pos;
