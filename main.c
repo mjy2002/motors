@@ -9,27 +9,27 @@
  *				-AUN FALTA LA CONVERSIÓN DE GRADOS A VALOR CONTADOR
  *		- El control de los motores a pasos serán la principal tarea del microcontrolador.
  *				-
- *		- Se habilitará la comunicación por SPI para recibir los valores de posición a los que debe de moverse el robot y avisar cuando se ha llegado.
+ *		- Se habilitará la comunicación por SERIE para recibir los valores de posición a los que debe de moverse el robot y avisar cuando se ha llegado.
  *		- Se habilitará una interrupción externa con la intención de detener los motores a pasos cuando exista alguna eventualidad en los contenedores.
  *
  *	Información sobre el pinout m328p:
  *
- *									 _________________
- *						 RESET - PD6|1 *   \___/	28|PC5 - SCL - COMUNICACIÓN - A5
- *									|2				27|PC4 - SDA - COMUNICACIÓN - A4
- *									|3				26|
- *			 D2 - INTERRUPCIÓN - PD2|4				25|
- *	D3 - DIRECCIÓN EN X - DIRX - PD3|5				24|PC1 - SENY - HOME Y - A1
- *	D4 - DIRECCIÓN EN Y - DIRY - PD4|6				23|PC0 - SENX - HOME X - A0
- *									|7				22|
- *									|8				21|
- *									|9				20|
- *									|10				19|
- *		 D5 - PASO EN X - PULX - PD5|11				18|
- *	   	 D6 - PASO EN Y - PULY - PD6|12				17|
- *									|13				16|PB2 - OC1B - SERVO 2 - D10
- *									|14				15|PB1 - OC1A - SERVO 1 - D9
- *									 ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
+ *                                   _________________
+ *                       RESET - PD6|1 *   \___/    28|PC5 - SCL - COMUNICACIÓN - A5
+ *                                  |2              27|PC4 - SDA - COMUNICACIÓN - A4
+ *                                  |3              26|
+ *           D2 - INTERRUPCIÓN - PD2|4              25|
+ *  D3 - DIRECCIÓN EN X - DIRX - PD3|5              24|PC1 - SENY - HOME Y - A1
+ *  D4 - DIRECCIÓN EN Y - DIRY - PD4|6              23|PC0 - SENX - HOME X - A0
+ *                                  |7              22|
+ *                                  |8              21|
+ *                                  |9              20|
+ *                                  |10             19|
+ *       D5 - PASO EN X - PULX - PD5|11             18|
+ *       D6 - PASO EN Y - PULY - PD6|12             17|
+ *                                  |13             16|PB2 - OC1B - SERVO 2 - D10
+ *                                  |14             15|PB1 - OC1A - SERVO 1 - D9
+ *                                   ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
  *								
  *
  *
@@ -64,8 +64,8 @@
 
 #define F_CPU 16000000UL
 #include <avr/io.h>
-#include <util/delay.h>
 #include <avr/interrupt.h>
+#include <util/delay.h>
 
 #define SENX PC0
 #define SENY PC1
@@ -73,6 +73,10 @@
 #define DIRY PD4
 #define PULX PD5
 #define PULY PD6
+
+volatile uint8_t p = 0;
+volatile uint8_t buffer[20];
+volatile uint8_t rxflag; 
 
 // Estructura para servomotores
 typedef struct Servos {
@@ -90,7 +94,7 @@ typedef struct Steppers {
 // Funciones para motor a pasos
 void init_stepper ();
 void step (char axis, uint32_t dly);
-void mov (uint32_t pos, char axis, char dir);
+void mov (uint32_t pos, char axis, char dir, Stepper *stpr);
 void home (Stepper *x, Stepper *y, uint8_t servo1, uint8_t servo2);
 
 // Funciones para servomotores
@@ -98,9 +102,9 @@ void init_gripper (uint8_t servo1, uint8_t servo2);
 void gripper (uint8_t gripper1_pos, uint8_t gripper2_pos);
 
 //Funciones para comunicación
-void init_slave_TWI ();
-char recv_slave_TWI ();
-void send_slave_TWI ();
+void init_UART ();
+void tx_char (unsigned char data);
+void tx_string(char *bigdata);
 
 //Funciones miscelaneas
 void delay_ms(uint32_t count);
@@ -110,6 +114,8 @@ uint8_t readY();
 
 int main (void) // ,no probada
 {
+	init_UART();
+	
 	Servo servo1, servo2;
 	servo1.gripper_op = 45;
 	servo2.gripper_op = 135;
@@ -123,7 +129,7 @@ int main (void) // ,no probada
 	delay_ms(5000);
 	
 	cli();
-	//CODIGO DE HABILITACION PARA LA INTERRUPCIÓN
+	//CÓDIGO DE HABILITACION PARA LA INTERRUPCIÓN
 	sei();
 	
     while (1) 
@@ -131,6 +137,11 @@ int main (void) // ,no probada
 		//Wait for a command
     }
 }
+//FUNCIONES AVANZADAS------------------------------------------------------------------------------------------------------------
+
+
+
+//FUNCIONES DE MOVIMIENTO--------------------------------------------------------------------------------------------------------
 
 void init_stepper () //Función terminada, no probada
 {
@@ -152,14 +163,14 @@ void step (char axis, uint32_t dly) //Función terminada, no probada
 	else if (axis == 'y')
 		pul = PULY;
 
-//++++++++++++++++++++++++++++++++++++++++++++REVISAR QUE EL TIEMPO DE CONMUTACIÓN SEA SUFICIENTE+++++++++++++++++++++++++++++++++++++++
+//++++++++++++++++++++++++++++++++++++++++++++REVISAR QUE EL TIEMPO DE CONMUTACIÓN SEA SUFICIENTE++++++++++++++++++++++++++++++++
 	PORTD |= (1 << pul);
 	delay_us(5);
 	PORTD &= ~(1 << pul);
 	delay_us(dly);
 }
 
-void mov (uint32_t pos, char axis, char dir)//,no probada
+void mov (uint32_t pos, char axis, char dir, Stepper *stpr) //,no probada
 {
 	//Manejo de distancia dada por información llegada desde comunicación.
 	//Convención de dirección:	n = Negativo, en ambos ejes
@@ -187,20 +198,21 @@ void mov (uint32_t pos, char axis, char dir)//,no probada
 			PORTD |= (1 << DIRY);
 		}
 	}
-	for (uint32_t i = 0; i < pos; i++)
+	for (uint32_t i = 0; i < stpr->f_pos; i++)
 	{
-		// CÓDIGO CORRESPONIDENTE AL MOVIMIENTO CON ACCELERACIÓN //*****(EN DESICIÓN EL USO DE LUT O CÁLCULO EN TIEMPO REAL)******
+		// CÓDIGO CORRESPONIDENTE AL MOVIMIENTO CON ACCELERACIÓN //*****(EN DECISIÓN EL USO DE LUT O CÁLCULO EN TIEMPO REAL)*****
 		
 		
 		step(axis, dly);
 		
 		
-		// PASAR POR REFERENCIA EL MOTOR A PASOS A MOVER, PARA PODER ACTUALIZAR EL VALOR DE POSICION ACTUAL Y AHI MISMO CARGAR EL VALOR DE POSICION FINAL PARA 
-		//ELIMINAR uint32_t pos, PUES EL MISMO TRABAJO SE REALIZA EN LA ESTRUCTURA DEL STEPPER CON EL ATRIBUTO f_pos
+		// PASAR POR REFERENCIA EL MOTOR A PASOS A MOVER, PARA PODER ACTUALIZAR EL VALOR DE POSICION ACTUAL Y AHI MISMO CARGAR EL
+		// VALOR DE POSICION FINAL PARA ELIMINAR uint32_t pos, PUES EL MISMO TRABAJO SE REALIZA EN LA ESTRUCTURA DEL STEPPER CON 
+		// EL ATRIBUTO f_pos
 	}
 }
 
-void home (Stepper *x, Stepper *y, uint8_t servo1, uint8_t servo2)//Función terminada, no probada
+void home (Stepper *x, Stepper *y, uint8_t servo1, uint8_t servo2) //Función terminada, no probada
 {
 	//Función para llegar a home por medio de sensores.
 	gripper(servo1, servo2);
@@ -232,31 +244,44 @@ void init_gripper (uint8_t servo1, uint8_t servo2) //Función terminada, no proba
 	OCR1B = servo2;
 }
 
-void gripper (uint8_t gripper1_pos, uint8_t gripper2_pos)//Función terminada, no probada
+void gripper (uint8_t gripper1_pos, uint8_t gripper2_pos) //Función terminada, no probada
 {
-	//++++++++++++++++++++++++++++++++ GENERAR CONVERSIONES DE GRADOS A VALOR CONTADOR ++++++++++++++++++++++++++++++++++++++++
+	//++++++++++++++++++++++++++++++++ GENERAR CONVERSIONES DE GRADOS A VALOR CONTADOR ++++++++++++++++++++++++++++++++++++++++++
 	OCR1A = gripper1_pos;
 	OCR1B = gripper2_pos;
 }
 
-void init_slave_TWI ()//, no probada
+
+//FUNCIONES DE COMUNICACIÓN------------------------------------------------------------------------------------------------------
+
+void init_UART () //Función terminada, no probada
 {
-//+++++++++++++++++++++++++++++++++++++++++++PROBABLEMENTE SE CAMBIE A COMUNICACIÓN I2C+++++++++++++++++++++++++++++++++++++++++++++++++++
-	//Inicialización de comunicación por SPI
+	//Configuración utilizada: habilitación de RX y TX, habilitación de interrupciones por recepción 
+	// DATA STREAM: |	8	|	N	|	1	|	500Kbps	| Para otros valores referirse a la tabla del datasheet 
+	cli();
+	UCSR0B |= (1 << RXCIE0) | (1 << RXEN0) | (1 << TXEN0);
+	UCSR0C |= (1 << UCSZ01) | (1 << UCSZ00);
+	UBRR0 = 1;
+	sei();
 }
 
-char recv_slave_TWI ()//, no probada
+void tx_char (unsigned char data) //Función terminada, no probada
 {
-//+++++++++++++++++++++++++++++++++++++++++++PROBABLEMENTE SE CAMBIE A COMUNICACIÓN I2C+++++++++++++++++++++++++++++++++++++++++++++++++++
-	//Recepción de datos por SPI
-	return 0;
+	while (!(UCSR0A & (1 << UDRE0)));
+	UDR0 = data;
 }
 
-void send_slave_TWI ()//, no probada
+void tx_string(char *bigdata) //Función terminada, no probada
 {
-//+++++++++++++++++++++++++++++++++++++++++++PROBABLEMENTE SE CAMBIE A COMUNICACIÓN I2C+++++++++++++++++++++++++++++++++++++++++++++++++++
-	//Envío de comunicación por SPI
+	while (*bigdata != 0x00)
+	{
+		tx_char(*bigdata);
+		bigdata++;
+	}
 }
+
+
+//FUNCIONES MISCELANEAS----------------------------------------------------------------------------------------------------------
 
 void delay_ms (uint32_t count) //Función terminada, no probada 
 {
@@ -268,11 +293,6 @@ void delay_us (uint32_t count) //Función terminada, no probada
 {
 	while(count--) 
 		_delay_us(1);
-}
-
-ISR(INT0_vect) //, no probada
-{
-	
 }
 
 uint8_t readX() //Función terminada, no probada
@@ -293,4 +313,23 @@ uint8_t readY() //Función terminada, no probada
 		return 0;
 	else
 		return 1;
+}
+
+
+//INTERRUPCIONES-----------------------------------------------------------------------------------------------------------------
+
+ISR(INT0_vect) //, no probada
+{
+	
+}
+
+ISR(USART_RX_vect)//Función terminada, no probada
+{
+	buffer[p] = UDR0;
+	if (buffer[p++] == '\r')
+	{
+		rxflag = 1;
+		buffer[p-1] = 0x00;
+		p = 0;
+	}
 }
