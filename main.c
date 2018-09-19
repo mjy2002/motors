@@ -1,16 +1,43 @@
 /*
+ * ----------------------------------------v0.1.0----------------------------------------
+ *
+ * Se crea el programa basado en "UHC_v0.1.2", se generan funciones de:
+ *         
+ *			+ Control de servomotores
+ *			+ Control de motores a pasos
+ *			+ Comunicación vía serie
+ *
+ *		El software espera la recepción de información desde el microcontrolador maestro y se
+ * mueve a la posición indicada.
+ *
+ *		Este microcontrolador solo recibe la posición final absoluta, el cálculo de pasos se
+ * realiza en la función dedicada para eso.
+ *
+ *		Al llegar a la posición da un aviso de haber llegado al maestro y se mantiene ahi hasta
+ * que le llega una nueva posición a la cual desplazarse.
+ *
+ *		Otros datos a enviar son:
+ *
+ *			+ Estoy en HOME
+ *			+ Gripper abierto
+ *			+ Gripper cerrado 
+ * --------------------------------------------------------------------------------------
+ *
  * Motores-Stepper-Servo.c
  *
- * La idea principal de este programa es convertirse en una libreria posteriormente.
  * Los objetivos son los siguientes:
  *		
  *		+ El microcontrolador usado será un m328p. 
  *		- Se usará PWM para el control de los servomotores.
- *				-AUN FALTA LA CONVERSIÓN DE GRADOS A VALOR CONTADOR
+ *				-AÚN FALTA LA CONVERSIÓN DE GRADOS A VALOR CONTADOR
  *		- El control de los motores a pasos serán la principal tarea del microcontrolador.
- *				-
- *		- Se habilitará la comunicación por SERIE para recibir los valores de posición a los que debe de moverse el robot y avisar cuando se ha llegado.
- *		- Se habilitará una interrupción externa con la intención de detener los motores a pasos cuando exista alguna eventualidad en los contenedores.
+ *				-AÚN FALTA DECIDIR SI SE USARÁ UNA TABLA LUT O UN CÁLCULO EN TIEMPO REAL PARA LA ACELERACIÓN DE LOS MOTORES
+ *		- Se habilitará la comunicación por SERIE para recibir los valores de posición a los que debe de moverse el robot y 
+ *        avisar cuando se ha llegado.
+ *				-AÚN FALTA IMPLEMENTAR LA RECEPCIÓN DE DATOS EN LA FUNCIÓN MAIN
+ *		- Se habilitará una interrupción externa con la intención de detener los motores a pasos cuando exista alguna 
+ *        eventualidad en los contenedores.
+ *				-INTERRUPCION DE EMERGENCIA AÚN NO IMPLEMENTADA
  *
  *	Información sobre el pinout m328p:
  *
